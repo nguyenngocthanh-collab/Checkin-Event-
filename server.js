@@ -5,13 +5,18 @@ const errorHandler = require("./errorHandler");
 const fs = require("fs");
 const db = require("./db");
 
+// Đảm bảo thư mục uploads tồn tại
+if (!fs.existsSync("uploads")) {
+    fs.mkdirSync("uploads");
+}
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "uploads/"); // thư mục lưu file
+        cb(null, "uploads/"); 
     },
     filename: (req, file, cb) => {
-        const name = crypto.randomUUID() + ".png";
-        cb(null, name); // hàm randomuuid trả về một cái tên ngẫu nhiên
+        const name = crypto.randomUUID() + ".jpg"; // Ảnh đã được nén thành jpg từ client
+        cb(null, name); 
     }
 });
 
@@ -25,6 +30,23 @@ app.get('/', (req, res) => {
     res.send("The server is running");
 });
 
+// Endpoint kiểm tra trạng thái ticket của thiết bị khi tải lại trang
+app.get("/api/status", (req, res) => {
+    const identityKey = req.query.identity_key;
+    if (!identityKey) return res.json({ exists: false });
+    
+    const participant = db.getParticipant.get(identityKey);
+    if (participant) {
+        return res.json({
+            exists: true,
+            status: participant.status,
+            ticket_code: participant.id
+        });
+    }
+    return res.json({ exists: false });
+});
+
+// Endpoint submit data chính
 app.post(
     "/api/submit",
     upload.fields([
@@ -50,8 +72,6 @@ app.post(
             data = JSON.parse(jsonText);
 
         } catch (error) {
-
-            // JSON lỗi → xóa cả 2 file
             fs.unlinkSync(infoFile.path);
             fs.unlinkSync(imageFile.path);
 
@@ -64,9 +84,11 @@ app.post(
         if (
             typeof data.identity_key !== "string" ||
             typeof data.full_name !== "string" ||
-            typeof data.school !== "string"
+            typeof data.school !== "string" ||
+            data.identity_key.trim() === "" ||
+            data.full_name.trim() === "" ||
+            data.school.trim() === ""
         ) {
-
             fs.unlinkSync(infoFile.path);
             fs.unlinkSync(imageFile.path);
 
@@ -76,62 +98,53 @@ app.post(
             });
         }
 
-        if (
-            data.identity_key.trim() === "" ||
-            data.full_name.trim() === "" ||
-            data.school.trim() === ""
-        ) {
-
-            fs.unlinkSync(infoFile.path);
-            fs.unlinkSync(imageFile.path);
-
-            return res.status(400).json({
-                success: false,
-                message: "Thông tin đăng ký không được để trống"
-            });
-        }
-
-
-        const ticket_code = crypto.randomUUID(); // TẠO MÃ DỰ THƯỞNG - TẠM THỜI DÙNG TICKET UUID-
-        const imgpath = imageFile.path;
-
-
         try {
-            db.createParticipant(
+            // Lưu data và lấy ID dạng số sequential làm ticket
+            const ticketId = db.saveOrUpdateParticipant(
                 data.identity_key,
                 data.full_name,
                 data.school,
-                ticket_code,
-                imgpath
+                imageFile.path
             );
+            
+            // File info không cần giữ nữa
+            fs.unlinkSync(infoFile.path);
+
+            return res.json({
+                success: true,
+                ticket_code: ticketId
+            });
 
         } catch (error) {
+            fs.unlinkSync(infoFile.path);
+            fs.unlinkSync(imageFile.path);
 
-            if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
-                console.log("Identity đã tồn tại");
-
-                // Duplicate → xóa file đã upload
-                fs.unlinkSync(infoFile.path);
-                fs.unlinkSync(imageFile.path);
-
+            if (error.message === "ALREADY_CONFIRMED") {
                 return res.status(409).json({
                     success: false,
-                    message: "Thiết bị này đã tham gia"
+                    message: "Thiết bị này đã tham gia và nhận ticket thành công!"
                 });
             }
 
             next(error);
             return;
         }
-
-        fs.unlinkSync(infoFile.path);
-
-        res.json({
-            success: true,
-            ticket_code
-        });
     }
 );
+
+// Endpoint xác nhận client đã nhận được ticket an toàn
+app.post("/api/confirm", (req, res) => {
+    const { identity_key } = req.body;
+    if (!identity_key) return res.status(400).json({ success: false });
+
+    try {
+        db.markAsConfirmed(identity_key);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false });
+    }
+});
+
 app.use(errorHandler);
 
 app.listen(3000, () => {
