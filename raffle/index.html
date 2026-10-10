@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lucky Draw</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- TRANG 1: VÒNG QUAY -->
+  <main id="stage-wheel" class="stage page active">
+    <header class="heading">
+      <p class="eyebrow">SPECIAL EVENT</p>
+      <h1>LUCKY DRAW</h1>
+    </header>
+
+    <section class="stats">
+      <div class="stat">
+        <span>NGƯỜI THAM GIA</span>
+        <strong id="total">—</strong>
+      </div>
+      <div class="stat">
+        <span>ĐÃ TRÚNG GIẢI</span>
+        <strong id="drawn">0 / 3</strong>
+      </div>
+    </section>
+
+    <section class="wheel-area">
+      <div class="wheel-shell">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="1400" height="1400"></canvas>
+        <div class="wheel-center">
+          <span>LUCKY</span>
+          <strong>DRAW</strong>
+        </div>
+      </div>
+
+      <div class="readout">
+        <p id="current-prize" class="current-prize">&nbsp;</p>
+        <p id="current-ticket" class="current-ticket">SẴN SÀNG</p>
+        <p id="current-name" class="current-name">&nbsp;</p>
+      </div>
+
+      <p id="message" class="message">Đang tải...</p>
+      <button id="spin" disabled>QUAY THƯỞNG</button>
+    </section>
+  </main>
+
+  <!-- TRANG 2: KẾT QUẢ -->
+  <main id="stage-results" class="stage page">
+    <header class="heading">
+      <p class="eyebrow">CHÚC MỪNG</p>
+      <h1>NGƯỜI TRÚNG GIẢI</h1>
+    </header>
+
+    <section id="podium" class="podium"></section>
+
+    <button id="back" class="ghost">← Vòng quay</button>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

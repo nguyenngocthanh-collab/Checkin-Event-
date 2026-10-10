@@ -1,0 +1,233 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* Ảnh nền phủ toàn màn hình -> không còn viền đen */
+    background: #000 url('assets/background/gameartboard_1.png') center / cover no-repeat;
+    font-family: sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#app-container {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 393px;
+    height: 852px;
+    overflow: hidden;
+    transform-origin: center center;
+    /* transform được set bằng JS: translate(-50%,-50%) scale(s) */
+    background: transparent;
+}
+
+.stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.stage.active {
+    display: block;
+    opacity: 1;
+}
+
+/* --- Stage 1: JOIN --- */
+.slogan-img {
+    position: absolute;
+    top: 250px;
+    left: 0;
+    width: 393px;
+    pointer-events: none;
+}
+
+/* --- Stage 2: REGISTER --- */
+.panel-img {
+    position: absolute;
+    top: 130px;
+    left: 0;
+    width: 393px;
+    pointer-events: none;
+}
+.transparent-input {
+    position: absolute;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    -webkit-user-select: text;
+    user-select: text;
+}
+.transparent-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+#fullname {
+    top: 410px;
+    left: 87px;
+    width: 215px;
+    height: 40px;
+}
+#school {
+    top: 485px;
+    left: 87px;
+    width: 215px;
+    height: 40px;
+}
+#btn-submit-register {
+    position: absolute;
+    top: 560px;
+    left: 70px;
+    width: 250px;
+    height: 50px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* --- Stage 3: REVIEW ---
+   Vị trí frame và ô ảnh được JS set từ FRAME_TOP / WINDOW (app.js)
+   để CSS và ảnh xuất ra luôn khớp nhau. */
+.frame-img {
+    position: absolute;
+    left: 0;
+    top: 100px;          /* sẽ bị JS ghi đè */
+    width: 393px;
+    height: auto;
+    display: block;
+    pointer-events: none;
+    z-index: 5;          /* nằm trên ảnh */
+}
+
+#canvas-wrapper {
+    position: absolute;
+    overflow: hidden;
+    z-index: 2;          /* nằm dưới frame */
+    background: #000;
+    touch-action: none;
+    /* left/top/width/height được JS set */
+}
+
+#user-photo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: none;
+    max-height: none;
+    transform-origin: 0 0;
+    cursor: grab;
+    -webkit-user-drag: none;
+}
+#user-photo:active {
+    cursor: grabbing;
+}
+
+.action-buttons {
+    position: absolute;
+    top: 670px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 10;
+}
+.action-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 0.2s;
+    line-height: 0;
+}
+.action-btn:active {
+    transform: scale(0.95);
+}
+.action-btn img {
+    display: block;
+    height: 76px;   /* to hơn (trước là 64px) */
+    width: auto;
+}
+
+/* --- Stage 1 button (giữ nguyên) --- */
+.image-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 0.2s;
+    transform: translateY(-70px);
+}
+.image-btn:active {
+    transform: translateY(-70px) scale(0.95);
+}
+.image-btn img {
+    width: 300px;
+    height: auto;
+    max-width: none;
+}
+
+/* Overlay Result */
+#result-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+#result-overlay.hidden {
+    display: none;
+}
+.result-box {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 80%;
+    color: #333;
+}
+/* --- Stage 4: TICKET --- */
+.ticket-wrap {
+    position: absolute;
+    left: -6px;            /* panel rộng hơn màn hình một chút để hiện to */
+    top: 50%;
+    width: 405px;
+    transform: translateY(-50%);
+}
+.ticket-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+}
+.ticket-code {
+    position: absolute;
+    left: 50%;
+    top: 61%;              /* tâm ô dài trong panel, chỉnh số này nếu lệch lên/xuống */
+    transform: translate(-50%, -50%);
+    width: 62%;            /* bằng bề ngang ô dài trong panel */
+    text-align: center;
+    white-space: nowrap;
+    font-family: 'Times New Roman', Georgia, serif;
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: #ffe7b0;
+    text-shadow: 0 0 8px rgba(255, 214, 140, 0.8), 0 0 2px rgba(255, 240, 200, 0.9);
+}

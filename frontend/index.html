@@ -1,35 +1,65 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Event</title>
-    </head>
-    <body>
-        <h1>Đăng ký sự kiện</h1>
-        <form>
-            <label>
-                Họ và tên:
-                <input type="text" id="fullname">
-            </label>
-            <br><br>
-            <label>
-                Trường đang học:
-                <input type="text" id="school">
-            </label>
-            <br><br>
-            <label>
-                Ảnh:
-                <input type="file" id="avt">
-            </label>
-            <br><br>
-            <button id="submit" type="submit">
-                Đăng ký
-            </button>
-        </form>
-        <p id="result">
-            Mã dự thưởng của bạn là:
-        </p>
-        
-        <script src="app.js"></script>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Sự kiện</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+</head>
+<body>
+    <div id="app-container">
 
-    </body>
+        <!-- Stage 1: JOIN -->
+        <div id="stage-join" class="stage active">
+            <img src="assets/JOIN/Slogan.svg" alt="Slogan" class="slogan-img">
+            <button id="btn-start-join" class="image-btn" style="position: absolute; top: 600px; left: 45px; z-index: 10;">
+                <img src="assets/JOIN/button.svg" alt="Tham gia" style="width: 303px;">
+            </button>
+        </div>
+
+        <!-- Stage 2: REGISTER -->
+        <div id="stage-register" class="stage">
+            <img src="assets/register/regispanel.svg" alt="Panel" class="panel-img">
+            <input type="text" id="fullname" class="transparent-input" placeholder="Họ và tên">
+            <input type="text" id="school" class="transparent-input" placeholder="Trường đang học">
+            <button id="btn-submit-register"></button>
+            <input type="file" id="camera-input" accept="image/*" capture="user" style="display:none">
+        </div>
+
+        <!-- Stage 3: REVIEW-IMAGE -->
+        <div id="stage-review" class="stage">
+            <div id="canvas-wrapper">
+                <img id="user-photo" alt="">
+            </div>
+
+            <img src="assets/preview_image/frame.svg" alt="Frame" class="frame-img" id="frame-img">
+
+            <div class="action-buttons">
+                <button id="btn-submit-final" class="action-btn">
+                    <img src="assets/preview_image/button1.svg" alt="Gửi">
+                </button>
+                <button id="btn-retake" class="action-btn">
+                    <img src="assets/preview_image/button2.svg" alt="Chụp lại">
+                </button>
+            </div>
+        </div>
+
+        <div id="result-overlay" class="hidden">
+            <div class="result-box">
+                <p id="result-text">Đang xử lý...</p>
+            </div>
+        </div>
+                <!-- Stage 4: TICKET -->
+        <div id="stage-ticket" class="stage">
+            <div class="ticket-wrap">
+                <img src="assets/ticket/ticket.png" alt="Mã số vé của bạn" class="ticket-img">
+                <div id="ticket-code" class="ticket-code"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
 </html>
