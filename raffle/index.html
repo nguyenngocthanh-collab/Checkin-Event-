@@ -1,15 +1,30 @@
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lucky Draw</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#10152d">
+  <title>Lucky Draw — Special Event</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
+  <div class="background-overlay"></div>
+
   <!-- TRANG 1: VÒNG QUAY -->
   <main id="stage-wheel" class="stage page active">
+
+    <header class="top-brand">
+      <img
+        class="slogan"
+        src="frontend/assets/JOIN/Slogan.svg"
+        alt="Slogan sự kiện"
+        onerror="this.style.display='none'"
+      >
+      <div class="brand-line"></div>
+    </header>
+
     <header class="heading">
       <p class="eyebrow">SPECIAL EVENT</p>
       <h1>LUCKY DRAW</h1>
@@ -26,39 +41,90 @@
       </div>
     </section>
 
-    <section class="wheel-area">
-      <div class="wheel-shell">
-        <div class="pointer"></div>
-        <canvas id="wheel" width="1400" height="1400"></canvas>
-        <div class="wheel-center">
-          <span>LUCKY</span>
-          <strong>DRAW</strong>
+    <section class="wheel-layout">
+
+      <div class="wheel-column">
+        <div class="wheel-area">
+          <div class="wheel-shell">
+            <div class="pointer"></div>
+
+            <canvas
+              id="wheel"
+              width="1400"
+              height="1400"
+            ></canvas>
+
+            <div class="wheel-center">
+              <span>LUCKY</span>
+              <strong>DRAW</strong>
+            </div>
+          </div>
+
+          <div class="readout">
+            <p id="current-prize" class="current-prize">&nbsp;</p>
+            <p id="current-ticket" class="current-ticket">SẴN SÀNG</p>
+            <p id="current-name" class="current-name">&nbsp;</p>
+          </div>
+
+          <p id="message" class="message">Đang tải...</p>
+
+          <button id="spin" disabled>QUAY THƯỞNG</button>
         </div>
       </div>
 
-      <div class="readout">
-        <p id="current-prize" class="current-prize">&nbsp;</p>
-        <p id="current-ticket" class="current-ticket">SẴN SÀNG</p>
-        <p id="current-name" class="current-name">&nbsp;</p>
-      </div>
+      <!-- BẢNG NGƯỜI TRÚNG TẠM THỜI -->
+      
+<aside id="winner-preview" class="winner-preview" hidden>
+  <div class="preview-heading">
+    <span class="preview-sparkle">✦</span>
+    <p>CHÚC MỪNG</p>
+    <h2 id="preview-prize">GIẢI BA</h2>
+  </div>
 
-      <p id="message" class="message">Đang tải...</p>
-      <button id="spin" disabled>QUAY THƯỞNG</button>
+  <div class="preview-photo-wrap">
+    <img
+      id="preview-photo"
+      class="preview-photo"
+      src=""
+      alt="Ảnh người trúng giải"
+    >
+  </div>
+
+  <div class="preview-info">
+    <h3 id="preview-name"></h3>
+    <p id="preview-school"></p>
+    <span id="preview-ticket"></span>
+  </div>
+</aside>
+
+
     </section>
   </main>
 
-  <!-- TRANG 2: KẾT QUẢ -->
-  <main id="stage-results" class="stage page">
-    <header class="heading">
-      <p class="eyebrow">CHÚC MỪNG</p>
-      <h1>NGƯỜI TRÚNG GIẢI</h1>
+  <!-- TRANG 2: CÔNG BỐ KẾT QUẢ -->
+  <main id="stage-results" class="stage page results-page">
+
+    <header class="results-header">
+      <img
+        class="slogan results-slogan"
+        src="/assets/JOIN/Slogan.svg"
+        alt="Slogan sự kiện"
+        onerror="this.style.display='none'"
+      >
+
+      <div class="results-divider">
+        <span>✦</span>
+        <span class="divider-line"></span>
+        <span>✦</span>
+      </div>
     </header>
 
     <section id="podium" class="podium"></section>
 
-    <button id="back" class="ghost">← Vòng quay</button>
+    <button id="back" class="ghost">← VÒNG QUAY</button>
+
   </main>
 
-  <script src="app.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>

@@ -1,152 +1,286 @@
+
 const express = require("express");
 const crypto = require("crypto");
 const multer = require("multer");
-const errorHandler = require("./errorHandler");
 const fs = require("fs");
+const path = require("path");
 const db = require("./db");
 
-// Đảm bảo thư mục uploads tồn tại
-if (!fs.existsSync("uploads")) {
-    fs.mkdirSync("uploads");
-}
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
+
+const ROOT = __dirname;
+const UPLOAD_DIR = path.join(ROOT, "uploads");
+const FRONTEND_DIR = path.join(ROOT, "frontend");
+
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+app.disable("x-powered-by");
+app.use(express.json({ limit: "100kb" }));
+app.use(express.static(FRONTEND_DIR));
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "uploads/"); 
-    },
-    filename: (req, file, cb) => {
-        const name = crypto.randomUUID() + ".jpg"; // Ảnh đã được nén thành jpg từ client
-        cb(null, name); 
+  destination: (_req, _file, cb) => {
+    cb(null, UPLOAD_DIR);
+  },
+
+  filename: (_req, _file, cb) => {
+    cb(null, `${crypto.randomUUID()}.png`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    files: 2,
+    fileSize: 12 * 1024 * 1024
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.fieldname === "avt" && file.mimetype !== "image/png") {
+      return cb(new Error("Ảnh đăng ký phải ở định dạng PNG."));
     }
+
+    if (
+      file.fieldname === "info" &&
+      file.mimetype !== "application/json"
+    ) {
+      return cb(new Error("File thông tin phải là JSON."));
+    }
+
+    cb(null, true);
+  }
 });
 
-const app = express();
-const upload = multer({ storage });
+function normalizeText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-app.use(express.json());
-app.use(express.static("frontend"));
+function safeUnlink(filePath) {
+  if (!filePath) return;
 
-app.get('/', (req, res) => {
-    res.send("The server is running");
+  try {
+    const absolutePath = path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(ROOT, filePath);
+
+    if (
+      absolutePath.startsWith(UPLOAD_DIR + path.sep) ||
+      absolutePath.startsWith(path.join(ROOT, "temp") + path.sep)
+    ) {
+      if (fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+      }
+    }
+  } catch (error) {
+    console.error("Không xóa được file:", error.message);
+  }
+}
+
+function getParticipantResponse(participant) {
+  return {
+    success: true,
+    exists: true,
+    ticket_code: participant.id,
+    status: participant.status,
+    submission_id: participant.submission_id || null
+  };
+}
+
+app.get("/", (_req, res) => {
+  res.send("The server is running");
 });
 
-// Endpoint kiểm tra trạng thái ticket của thiết bị khi tải lại trang
+// Khôi phục đăng ký đã được lưu.
 app.get("/api/status", (req, res) => {
-    const identityKey = req.query.identity_key;
-    if (!identityKey) return res.json({ exists: false });
-    
-    const participant = db.getParticipant.get(identityKey);
-    if (participant) {
-        return res.json({
-            exists: true,
-            status: participant.status,
-            ticket_code: participant.id
-        });
-    }
-    return res.json({ exists: false });
+  const identityKey = normalizeText(req.query.identity_key);
+  const submissionId = normalizeText(req.query.submission_id);
+
+  if (!identityKey && !submissionId) {
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu identity_key hoặc submission_id"
+    });
+  }
+
+  const participant =
+    (submissionId
+      ? db.getParticipantBySubmission(submissionId)
+      : null) ||
+    (identityKey
+      ? db.getParticipant(identityKey)
+      : null);
+
+  if (!participant) {
+    return res.json({
+      success: true,
+      exists: false
+    });
+  }
+
+  return res.json(getParticipantResponse(participant));
 });
 
-// Endpoint submit data chính
+// Nhận thông tin và ảnh.
 app.post(
-    "/api/submit",
-    upload.fields([
-        { name: "avt", maxCount: 1 },
-        { name: "info", maxCount: 1 }
-    ]),
-    (req, res, next) => {
+  "/api/submit",
+  upload.fields([
+    { name: "avt", maxCount: 1 },
+    { name: "info", maxCount: 1 }
+  ]),
+  (req, res) => {
+    const imageFile = req.files?.avt?.[0];
+    const infoFile = req.files?.info?.[0];
 
-        if (!req.files?.avt?.[0] || !req.files?.info?.[0]) {
-            return res.status(400).json({
-                success: false,
-                message: "Thiếu file avt hoặc info"
-            });
-        }
+    if (!imageFile || !infoFile) {
+      safeUnlink(imageFile?.path);
+      safeUnlink(infoFile?.path);
 
-        const infoFile = req.files.info[0];
-        const imageFile = req.files.avt[0];
-
-        let data;
-
-        try {
-            const jsonText = fs.readFileSync(infoFile.path, "utf8");
-            data = JSON.parse(jsonText);
-
-        } catch (error) {
-            fs.unlinkSync(infoFile.path);
-            fs.unlinkSync(imageFile.path);
-
-            return res.status(400).json({
-                success: false,
-                message: "Dữ liệu info không hợp lệ"
-            });
-        }
-
-        if (
-            typeof data.identity_key !== "string" ||
-            typeof data.full_name !== "string" ||
-            typeof data.school !== "string" ||
-            data.identity_key.trim() === "" ||
-            data.full_name.trim() === "" ||
-            data.school.trim() === ""
-        ) {
-            fs.unlinkSync(infoFile.path);
-            fs.unlinkSync(imageFile.path);
-
-            return res.status(400).json({
-                success: false,
-                message: "Thông tin đăng ký không hợp lệ"
-            });
-        }
-
-        try {
-            // Lưu data và lấy ID dạng số sequential làm ticket
-            const ticketId = db.saveOrUpdateParticipant(
-                data.identity_key,
-                data.full_name,
-                data.school,
-                imageFile.path
-            );
-            
-            // File info không cần giữ nữa
-            fs.unlinkSync(infoFile.path);
-
-            return res.json({
-                success: true,
-                ticket_code: ticketId
-            });
-
-        } catch (error) {
-            fs.unlinkSync(infoFile.path);
-            fs.unlinkSync(imageFile.path);
-
-            if (error.message === "ALREADY_CONFIRMED") {
-                return res.status(409).json({
-                    success: false,
-                    message: "Thiết bị này đã tham gia và nhận ticket thành công!"
-                });
-            }
-
-            next(error);
-            return;
-        }
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu file ảnh hoặc file thông tin."
+      });
     }
-);
 
-// Endpoint xác nhận client đã nhận được ticket an toàn
-app.post("/api/confirm", (req, res) => {
-    const { identity_key } = req.body;
-    if (!identity_key) return res.status(400).json({ success: false });
+    let data;
 
     try {
-        db.markAsConfirmed(identity_key);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ success: false });
+      data = JSON.parse(fs.readFileSync(infoFile.path, "utf8"));
+    } catch {
+      safeUnlink(imageFile.path);
+      safeUnlink(infoFile.path);
+
+      return res.status(400).json({
+        success: false,
+        message: "File thông tin không hợp lệ."
+      });
     }
+
+    const identityKey = normalizeText(data.identity_key);
+    const submissionId = normalizeText(data.submission_id);
+    const fullName = normalizeText(data.full_name);
+    const school = normalizeText(data.school);
+
+    if (
+      !identityKey ||
+      !submissionId ||
+      !fullName ||
+      !school ||
+      identityKey.length > 200 ||
+      submissionId.length > 200 ||
+      fullName.length > 200 ||
+      school.length > 200
+    ) {
+      safeUnlink(imageFile.path);
+      safeUnlink(infoFile.path);
+
+      return res.status(400).json({
+        success: false,
+        message: "Thông tin đăng ký thiếu hoặc không hợp lệ."
+      });
+    }
+
+    try {
+      const saved = db.saveOrGetParticipant({
+        identityKey,
+        submissionId,
+        fullName,
+        school,
+        imagePath: path.relative(ROOT, imageFile.path)
+      });
+
+      // Nếu là yêu cầu trùng, ảnh mới không được sử dụng.
+      if (!saved.useUploadedImage) {
+        safeUnlink(imageFile.path);
+      }
+
+      safeUnlink(infoFile.path);
+
+      // Retry cùng yêu cầu luôn trả về vé đã tồn tại.
+      return res.status(200).json({
+        success: true,
+        duplicate: saved.duplicate,
+        ticket_code: saved.participant.id,
+        status: saved.participant.status,
+        submission_id:
+          saved.participant.submission_id || submissionId,
+        message: "Đã ghi nhận đăng ký."
+      });
+    } catch (error) {
+      safeUnlink(imageFile.path);
+      safeUnlink(infoFile.path);
+
+      console.error("Lỗi /api/submit:", error);
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Máy chủ chưa xác nhận đăng ký. Hệ thống sẽ thử lại."
+      });
+    }
+  }
+);
+
+// Xác nhận trạng thái vé. Có thể gọi nhiều lần.
+app.post("/api/confirm", (req, res) => {
+  const identityKey = normalizeText(req.body?.identity_key);
+
+  if (!identityKey) {
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu identity_key."
+    });
+  }
+
+  try {
+    const found = db.markAsConfirmed(identityKey);
+
+    if (!found) {
+      return res.status(404).json({
+        success: false,
+        message: "Chưa tìm thấy người tham gia."
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Lỗi /api/confirm:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Chưa xác nhận được trạng thái vé."
+    });
+  }
 });
 
-app.use(errorHandler);
+// Xử lý lỗi upload và lỗi server.
+app.use((error, _req, res, _next) => {
+  console.error("Lỗi server:", error);
 
-app.listen(3000, () => {
-    console.log("server running at http://localhost:3000");
+  if (error instanceof multer.MulterError) {
+    const message =
+      error.code === "LIMIT_FILE_SIZE"
+        ? "Ảnh vượt quá dung lượng cho phép (12 MB)."
+        : `Lỗi tải file: ${error.message}`;
+
+    return res.status(400).json({
+      success: false,
+      message
+    });
+  }
+
+  if (error.message?.includes("định dạng")) {
+    return res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+
+  return res.status(500).json({
+    success: false,
+    message: "Lỗi máy chủ."
+  });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });

@@ -184,16 +184,23 @@ async function fetchStatus() {
     return await res.json();
 }
 
+
 async function checkStatus() {
-    try {
-        const data = await fetchStatus();
-        if (data.exists && data.status === 1) {
-            showTicket(data.ticket_code);
-        }
-    } catch (e) {
-        console.error("Lỗi khi check status:", e);
+  try {
+    const data = await fetchStatus();
+
+    if (data.exists && data.ticket_code != null) {
+      showTicket(data.ticket_code);
+
+      if (data.status !== 1) {
+        confirmUntilAcknowledged(identity_key);
+      }
     }
+  } catch (error) {
+    console.error("Không kiểm tra được trạng thái đăng ký:", error);
+  }
 }
+
 checkStatus();
 
 // =====================================================
@@ -402,46 +409,121 @@ async function handleAlreadyRegistered(result) {
     setTimeout(() => resultOverlay.classList.add('hidden'), 3000);
 }
 
+
 async function uploadData(imageBlob) {
-    showResult("Đang gửi dữ liệu...");
-    const info = {
-        identity_key: identity_key,
-        full_name: fullname.value,
-        school: school.value
-    };
+  showResult(
+    "Đang lưu đăng ký...<br><br>" +
+    "Khi có nhiều người cùng tham gia, quá trình có thể lâu hơn bình thường.<br><br>" +
+    "Vui lòng giữ trang mở, không đóng trình duyệt hoặc xóa dữ liệu."
+  );
 
-    const form_data = new FormData();
-    form_data.append("info", new Blob([JSON.stringify(info)], { type: "application/json" }), "info.json");
-    form_data.append("avt", imageBlob, "avt.png");
+  try {
+    await ReliableSubmit.send({
+      identityKey: identity_key,
+      fullName: fullname.value.trim(),
+      school: school.value.trim(),
+      imageBlob,
 
-    try {
-        const response = await fetchWithRetry("/api/submit", {
-            method: "POST",
-            body: form_data
-        }, 3);
+      onStatus(message) {
+        showResult(
+          `${message}<br><br>` +
+          "Vui lòng giữ trang mở. Hệ thống đang tự xử lý."
+        );
+      },
 
-        const result = await response.json();
+      onSuccess(result) {
+        showTicket(result.ticket_code);
 
-        if (response.ok) {
-            await fetchWithRetry("/api/confirm", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ identity_key })
-            }, 3);
-            showTicket(result.ticket_code);
-        } else if (response.status === 409) {
-            await handleAlreadyRegistered(result);
-        } else {
-            showResult(result.message || "Có lỗi xảy ra, vui lòng thử lại");
-            setTimeout(() => resultOverlay.classList.add('hidden'), 3000);
-        }
-    } catch (error) {
-        showResult("Lỗi kết nối mạng. Vui lòng thử lại");
-        setTimeout(() => resultOverlay.classList.add('hidden'), 3000);
+        // Xác nhận trạng thái riêng; không làm mất mã vé đã nhận.
+        confirmUntilAcknowledged(identity_key);
+      },
+
+      onPermanentError(message) {
+        showResult(
+          `${message}<br><br>` +
+          "Hãy kiểm tra thông tin rồi thử đăng ký lại."
+        );
+      }
+    });
+  } catch (error) {
+    console.error("Lỗi gửi đăng ký:", error);
+
+    if (error.permanent) {
+      showResult(
+        "Dữ liệu đăng ký chưa hợp lệ.<br><br>" +
+        "Vui lòng kiểm tra thông tin và thử lại."
+      );
+    } else {
+      showResult(
+        "Chưa lưu được yêu cầu vào bộ nhớ trình duyệt.<br><br>" +
+        "Kiểm tra dung lượng lưu trữ hoặc cài đặt trình duyệt rồi thử lại."
+      );
     }
+  }
 }
+
+async function confirmUntilAcknowledged(identityKey) {
+  let attempt = 0;
+
+  while (true) {
+    try {
+      const response = await fetch("/api/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          identity_key: identityKey
+        })
+      });
+
+      if (response.ok) return;
+
+      if (response.status === 404) {
+        // Đăng ký có thể chưa được tìm thấy do lỗi bất thường.
+        // Không kết luận rằng vé đã mất.
+        console.error("Chưa tìm thấy bản ghi để xác nhận vé.");
+      }
+    } catch (error) {
+      console.error("Lỗi xác nhận trạng thái:", error);
+    }
+
+    attempt++;
+
+    const delay = Math.min(
+      1000 * 2 ** Math.min(attempt, 5),
+      30000
+    );
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+}
+
 
 function showResult(html) {
     resultOverlay.classList.remove('hidden');
     resultText.innerHTML = html;
 }
+
+ReliableSubmit.resumePending({
+  onStatus(message) {
+    showResult(
+      `${message}<br><br>` +
+      "Đang khôi phục đăng ký trước đó. Vui lòng giữ trang mở."
+    );
+  },
+
+  onSuccess(result) {
+    showTicket(result.ticket_code);
+    confirmUntilAcknowledged(identity_key);
+  },
+
+  onPermanentError(message) {
+    showResult(
+      `${message}<br><br>` +
+      "Yêu cầu trước đó cần được kiểm tra trước khi tiếp tục."
+    );
+  }
+}).catch(error => {
+  console.error("Không khôi phục được hàng đợi:", error);
+});
